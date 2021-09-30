@@ -1,0 +1,58 @@
+# Arduino interface between Micra K12 steering wheel controls (SWC) and Blaunpunkt Vancouver CD35 head unit (HU)
+
+# Introduction
+
+I replaced the stock head unit (HU) in my Nissan Micra K12 to gain an AUX port which the stock HU didn't have. Unfortunately, this meant that the steering wheel controls (SWC) no longer worked, since they use some kind of proprietary protocol to control the stock unit.
+
+## SWC protocol
+
+The service manual for the Micra K12 includes a section on electronic components, including the expected resistances & voltages seen across the wires used to connect the SWC to the stock head unit. Reading up on this online, I found that most SWCs use a resistor array/ladder configuration, so the combination of button-presses on the steering wheel controls is communicated as a unique resistance reading across the pins/wires.
+
+## Blaupunkt protocol
+
+The "new" Blaupunkt unit (Vancouver CD35) manual mentions that it is compatible with two remote control units: RC08 and RC10. I couldn't find any for sale online, but I came across a website where somebody had figured out the RC10 protocol for interfacing with the radio unit: https://dren.dk/lacetti-blaupunkt.html. This indicates that the infrared (IR) receiver part of the RC10 unit responds to button presses on the remote control by sending a series of pulses of different lengths to the head unit. These should be able to be recreated by an Arduino!
+
+# Pinouts
+
+## SWC
+
+C2 mini iso connector on the stock radio:
+Remote control A: 10
+Remote control B: 11
+Remote control GND: 12
+
+## Blaupunkt radio
+
+C2 mini iso connector on the Blaupunkt radio:
+Remote control 12V: 10
+Remote control input: 11
+Remote control GND: 12
+
+# Configuration
+
+## Ladder resistors & converting to single wire pair
+
+The steering wheel has 5 buttons on 2 wires (plus one ground wire). Measuring between either wire and ground on the stock configuration you would get:
+MODE (SRC): A, 0V
+SEEK UP: A, 1.68V
+VOL UP: A, 3.34V
+nothing pressed: A, 5V
+SEEK DOWN: B, 1.68V
+VOL DOWN: B, 3.34V
+nothing pressed: B, 5V
+
+Conversely, each button press is associated with a resistance between the wire and ground [this is for pins on the steering wheel side, approximate values]:
+MODE (SRC): terminal 14, 0ohm
+VOL UP: terminal 14, 165ohm
+SEEK UP: terminal 14, 652ohm
+VOL DOWN: terminal 15, 165ohm
+SEEK DOWN: terminal 15, 652ohm
+
+For this setup to work, there also needs to be a 330ohm resistor in series with the 5V voltage between the steering wheel pins.
+
+To convert this into a single-wire setup, I've also added a 680ohm resistor in series with the steering wheel B pin - this means that for each button press, we get a unique resistance/voltage reading, and they are spread maximally apart according to some maths and eyeballing I did (see the R file and attached plots!)
+
+## 5V power supply
+
+The Arduino Nano needs a 5V DC supply, but the car runs on 12V, so a step-down converter is needed. I opted for the Pololu 5V, 500mA Step-Down Voltage Regulator D24V5F5 because it was what the shop had in stock and because of its compact size (a 7805 regulator would have worked but with the associated circuitry it would have taken up a lot more space). 500mA is overkill but there was no price difference for the smaller option. I've also opted to include a filter capacitor on the 12V input to filter any voltage spikes associated with ignition and a rectifier diode for polarity protection. I'm also adding a bypass capacitor to the 5V line just in case.
+
